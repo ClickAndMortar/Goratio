@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/clickandmortar/goratio/zipcode"
+	"github.com/ClickAndMortar/Goratio/zipcode"
 	"github.com/go-ozzo/ozzo-validation"
 	"github.com/go-ozzo/ozzo-validation/is"
 	"github.com/ttacon/libphonenumber"
@@ -14,10 +14,10 @@ import (
 )
 
 type Location struct {
-	Email string `json:"email,omitempty"`
-	Phone Phone  `json:"phone,omitempty"`
-	Zip   Zip    `json:"zip,omitempty"`
-	VatCode   string    `json:"vat_code,omitempty"`
+	Email   string `json:"email,omitempty"`
+	Phone   Phone  `json:"phone,omitempty"`
+	Zip     Zip    `json:"zip,omitempty"`
+	VatCode string `json:"vat_code,omitempty"`
 }
 
 type Phone struct {
@@ -34,7 +34,7 @@ type ResponseLocation struct {
 	Phone ResponsePhone `json:"phone,omitempty"`
 	Zip   ResponseZip   `json:"zip,omitempty"`
 	Email ResponseEmail `json:"email,omitempty"`
-	Vat  ResponseVat   `json:"vat,omitempty"`
+	Vat   ResponseVat   `json:"vat,omitempty"`
 }
 
 type ResponsePhone struct {
@@ -113,46 +113,78 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := &ResponseLocation{}
-
-	if location.Phone.Number != "" {
-		response.Phone.Number = location.Phone.Number
-		response.Phone.Country = location.Phone.Country
-		num, err := libphonenumber.Parse(location.Phone.Number, location.Phone.Country)
-		if err != nil {
-			response.Phone.Error = err.Error()
-		}
-
-		valid := libphonenumber.IsValidNumberForRegion(num, location.Phone.Country)
-		response.Phone.Valid = &valid
-
-		if valid {
-			response.Phone.Formatted.E164 = libphonenumber.Format(num, libphonenumber.E164)
-			response.Phone.Formatted.National = libphonenumber.Format(num, libphonenumber.NATIONAL)
-			response.Phone.Formatted.International = libphonenumber.Format(num, libphonenumber.INTERNATIONAL)
-		}
-	}
-
-	if location.Zip.Code != "" {
-		response.Zip.Code = location.Zip.Code
-		response.Zip.Country = location.Zip.Country
-		matched := zipcode.Validate(location.Zip.Code, location.Zip.Country)
-		response.Zip.Valid = &matched
-	}
-
-	if location.Email != "" {
-		response.Email.Address = location.Email
-		err = validation.Validate(location.Email, is.Email)
-		emailValid := err == nil
-		response.Email.Valid = &emailValid
-	}
-
-	if location.VatCode != "" {
-		response.Vat.Code = location.VatCode
-		response.Vat.Error = "Not yet implemented"
-	}
+	response.Phone = ValidatePhone(location.Phone)
+	response.Zip = ValidateZipCode(location.Zip)
+	response.Email = ValidateEmail(location.Email)
+	response.Vat = ValidateVat(location.VatCode)
 
 	output, _ := json.Marshal(response)
 	w.Write(output)
+}
+
+func ValidateZipCode(zip Zip) ResponseZip {
+	response := ResponseZip{}
+	if zip.Code == "" {
+		return response
+	}
+
+	response.Code = zip.Code
+	response.Country = zip.Country
+	matched := zipcode.Validate(zip.Code, zip.Country)
+	response.Valid = &matched
+
+	return response
+}
+
+func ValidatePhone(phone Phone) ResponsePhone {
+	response := ResponsePhone{}
+	if phone.Number == "" {
+		return response
+	}
+
+	response.Number = phone.Number
+	response.Country = phone.Country
+	num, err := libphonenumber.Parse(phone.Number, phone.Country)
+	if err != nil {
+		response.Error = err.Error()
+	}
+
+	valid := libphonenumber.IsValidNumberForRegion(num, phone.Country)
+	response.Valid = &valid
+
+	if valid {
+		response.Formatted.E164 = libphonenumber.Format(num, libphonenumber.E164)
+		response.Formatted.National = libphonenumber.Format(num, libphonenumber.NATIONAL)
+		response.Formatted.International = libphonenumber.Format(num, libphonenumber.INTERNATIONAL)
+	}
+
+	return response
+}
+
+func ValidateEmail(email string) ResponseEmail {
+	response := ResponseEmail{}
+	if email == "" {
+		return response
+	}
+
+	response.Address = email
+	err := validation.Validate(email, is.Email)
+	emailValid := err == nil
+	response.Valid = &emailValid
+
+	return response
+}
+
+func ValidateVat(code string) ResponseVat {
+	response := ResponseVat{}
+	if code == "" {
+		return response
+	}
+
+	response.Code = code
+	response.Error = "Not yet implemented"
+
+	return response
 }
 
 func (a Zip) Validate() error {

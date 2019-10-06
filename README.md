@@ -50,3 +50,9 @@ Will output the following result:
     }
 }
 ```
+
+## Testing
+
+```
+make test
+```

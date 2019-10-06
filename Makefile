@@ -8,3 +8,6 @@ build:
 
 docker:
 	docker build -t clickandmortar/goratio .
+
+test:
+	go test -coverprofile=coverage.out
