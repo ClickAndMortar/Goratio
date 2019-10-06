@@ -2,9 +2,9 @@
 
 Goratio is a location validation microservice for:
 
-* Postal codes / zip codes
+* Postal codes / zip codes (using [Unicode Common Locale Data Repository](http://cldr.unicode.org/) regexes)
 * Phone numbers (using [Google's libphonenumber](https://github.com/google/libphonenumber))
-* Email addresses (using [Unicode Common Locale Data Repository](http://cldr.unicode.org/))
+* Email addresses
 * VAT numbers (coming)
 
 ## Usage
