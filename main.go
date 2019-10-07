@@ -76,7 +76,9 @@ type ErrorResponse struct {
 }
 
 func main() {
-	http.HandleFunc("/validate", ValidateHandler)
+	http.HandleFunc("/validate", ValidateLocationHandler)
+	http.HandleFunc("/validate/zip", ValidateZipHandler)
+	http.HandleFunc("/validate/phone", ValidatePhoneHandler)
 
 	port := getEnvDefault("GORATIO_PORT", "8080")
 
@@ -84,9 +86,58 @@ func main() {
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 
-func ValidateHandler(w http.ResponseWriter, r *http.Request) {
+func ValidateLocationHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
+	location, errorResponse := ExtractLocation(r)
+	response, errorResponse := ValidateLocation(location, errorResponse)
+
+	if errorResponse.Error != "" {
+		errorOutput, _ := json.Marshal(errorResponse)
+		w.WriteHeader(400)
+		w.Write(errorOutput)
+		return
+	}
+
+	output, _ := json.Marshal(response)
+	w.Write(output)
+}
+
+func ValidateZipHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+
+	location, errorResponse := ExtractLocation(r)
+	response, errorResponse := ValidateLocation(location, errorResponse)
+
+	if errorResponse.Error != "" {
+		errorOutput, _ := json.Marshal(errorResponse)
+		w.WriteHeader(400)
+		w.Write(errorOutput)
+		return
+	}
+
+	output, _ := json.Marshal(response.Zip)
+	w.Write(output)
+}
+
+func ValidatePhoneHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+
+	location, errorResponse := ExtractLocation(r)
+	response, errorResponse := ValidateLocation(location, errorResponse)
+
+	if errorResponse.Error != "" {
+		errorOutput, _ := json.Marshal(errorResponse)
+		w.WriteHeader(400)
+		w.Write(errorOutput)
+		return
+	}
+
+	output, _ := json.Marshal(response.Phone)
+	w.Write(output)
+}
+
+func ExtractLocation(r *http.Request) (*Location, ErrorResponse) {
 	errorResponse := ErrorResponse{}
 
 	body, err := ioutil.ReadAll(r.Body)
@@ -100,26 +151,24 @@ func ValidateHandler(w http.ResponseWriter, r *http.Request) {
 		errorResponse.Error = err.Error()
 	}
 
-	err = location.Validate()
-	if err != nil {
-		errorResponse.Error = err.Error()
-	}
+	return location, errorResponse
+}
 
-	if errorResponse.Error != "" {
-		errorOutput, _ := json.Marshal(errorResponse)
-		w.WriteHeader(400)
-		w.Write(errorOutput)
-		return
-	}
-
+func ValidateLocation(location *Location, error ErrorResponse) (*ResponseLocation, ErrorResponse) {
 	response := &ResponseLocation{}
+
+	err := location.Validate()
+	if err != nil {
+		error.Error = err.Error()
+		return response, error
+	}
+
 	response.Phone = ValidatePhone(location.Phone)
 	response.Zip = ValidateZipCode(location.Zip)
 	response.Email = ValidateEmail(location.Email)
 	response.Vat = ValidateVat(location.VatCode)
 
-	output, _ := json.Marshal(response)
-	w.Write(output)
+	return response, error
 }
 
 func ValidateZipCode(zip Zip) ResponseZip {

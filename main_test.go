@@ -1,6 +1,12 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestValidZipcodes(t *testing.T) {
 	zip := Zip{
@@ -87,5 +93,88 @@ func TestInvalidPhone(t *testing.T) {
 	response = ValidatePhone(phone)
 	if *response.Valid {
 		t.Errorf("Expecting invalid CH phone number 07981395‬")
+	}
+}
+
+func TestHttpValidation(t *testing.T) {
+	req, err := http.NewRequest("POST", "/validation", strings.NewReader(`{ "phone": { "country": "FR", "number": "0123456789" }, "zip": { "code": "06000", "country": "FR" }, "email": "john.doe@example.com" }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(ValidateLocationHandler)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	rl := ResponseLocation{}
+	err = json.Unmarshal(rr.Body.Bytes(), &rl)
+	if err != nil {
+		t.Errorf("Unable to JSON-decode response: %s", err)
+	}
+
+	if *rl.Phone.Valid != true {
+		t.Errorf("Invalid phone number, expected valid")
+	}
+
+	if *rl.Zip.Valid != true {
+		t.Errorf("Invalid zip code, expected valid")
+	}
+
+	if *rl.Email.Valid != true {
+		t.Errorf("Invalid email address, expected valid")
+	}
+}
+
+func TestHttpValidationZip(t *testing.T) {
+	req, err := http.NewRequest("POST", "/validation/zip", strings.NewReader(`{ "zip": { "code": "0600", "country": "FR" } }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(ValidateZipHandler)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	rz := ResponseZip{}
+	err = json.Unmarshal(rr.Body.Bytes(), &rz)
+	if err != nil {
+		t.Errorf("Unable to JSON-decode response: %s", err)
+	}
+
+	if *rz.Valid == true {
+		t.Errorf("Expected invalid zip code")
+	}
+}
+
+func TestHttpValidationPhone(t *testing.T) {
+	req, err := http.NewRequest("POST", "/validation/zip", strings.NewReader(`{ "phone": { "country": "FR", "number": "012345679" } }`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(ValidatePhoneHandler)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	rp := ResponsePhone{}
+	err = json.Unmarshal(rr.Body.Bytes(), &rp)
+	if err != nil {
+		t.Errorf("Unable to JSON-decode response: %s", err)
+	}
+
+	if *rp.Valid == true {
+		t.Errorf("Expected invalid phone number")
 	}
 }
