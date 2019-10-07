@@ -13,7 +13,7 @@ Goratio is a location validation microservice for:
 
 See [OpenAPI specification](https://app.swaggerhub.com/apis-docs/Click-and-Mortar/Goratio/1.0.0#/) for full API doc.
 
-With the application running, post your query to the `/validation` endpoint:
+With the application running, post your query to the `/validate` endpoint:
 
 ```json
 {
