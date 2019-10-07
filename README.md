@@ -1,5 +1,7 @@
 # Goratio
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/ClickAndMortar/Goratio)](https://goreportcard.com/report/github.com/ClickAndMortar/Goratio) <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-70%25-brightgreen.svg?longCache=true&style=flat)</a>
+
 Goratio is a location validation microservice for:
 
 * Postal codes / zip codes (using [Unicode Common Locale Data Repository](http://cldr.unicode.org/) regexes)
