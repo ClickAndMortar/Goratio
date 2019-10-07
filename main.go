@@ -76,7 +76,7 @@ type ErrorResponse struct {
 }
 
 func main() {
-	http.HandleFunc("/validate", validateHandler)
+	http.HandleFunc("/validate", ValidateHandler)
 
 	port := getEnvDefault("GORATIO_PORT", "8080")
 
@@ -84,7 +84,7 @@ func main() {
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 
-func validateHandler(w http.ResponseWriter, r *http.Request) {
+func ValidateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	errorResponse := ErrorResponse{}
