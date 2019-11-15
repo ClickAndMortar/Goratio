@@ -6,17 +6,26 @@ import (
 	"github.com/ClickAndMortar/Goratio/zipcode"
 	"github.com/go-ozzo/ozzo-validation"
 	"github.com/go-ozzo/ozzo-validation/is"
+	"github.com/oschwald/geoip2-golang"
 	"github.com/ttacon/libphonenumber"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
+)
+
+var (
+	geoDB     *geoip2.Reader
+	geoEnable bool
+	err       error
 )
 
 type Location struct {
 	Email   string `json:"email,omitempty"`
 	Phone   Phone  `json:"phone,omitempty"`
 	Zip     Zip    `json:"zip,omitempty"`
+	IP      string `json:"ip,omitempty"`
 	VatCode string `json:"vat_code,omitempty"`
 }
 
@@ -34,6 +43,7 @@ type ResponseLocation struct {
 	Phone ResponsePhone `json:"phone,omitempty"`
 	Zip   ResponseZip   `json:"zip,omitempty"`
 	Email ResponseEmail `json:"email,omitempty"`
+	IP    ResponseIP    `json:"ip,omitempty"`
 	Vat   ResponseVat   `json:"vat,omitempty"`
 }
 
@@ -58,6 +68,19 @@ type ResponseEmail struct {
 	Error   string `json:"error,omitempty"`
 }
 
+type ResponseIP struct {
+	Address string        `json:"address,omitempty"`
+	Valid   *bool         `json:"valid,omitempty"`
+	Geo     ResponseIPGeo `json:"geo,omitempty"`
+	Error   string        `json:"error,omitempty"`
+}
+
+type ResponseIPGeo struct {
+	CountryCode string `json:"country_code"`
+	CountryName string `json:"country_name"`
+	City        string `json:"city"`
+}
+
 type ResponseVat struct {
 	Code  string `json:"code,omitempty"`
 	Valid *bool  `json:"valid,omitempty"`
@@ -76,9 +99,24 @@ type ErrorResponse struct {
 }
 
 func main() {
+	geoEnable = true
+	geodbPath := getEnvDefault("GEOIP_DB_PATH", "/var/GeoIP2.mmdb")
+	if _, err := os.Stat(geodbPath); os.IsNotExist(err) {
+		geoEnable = false
+		fmt.Printf("GeoIP DB does not exist at [%s], feature disabled", geodbPath)
+	}
+
+	geoDB, err = geoip2.Open(geodbPath)
+	if err != nil {
+		geoEnable = false
+		fmt.Printf("GeoIP DB loading error from [%s]: %s", geodbPath, err)
+	}
+	defer geoDB.Close()
+
 	http.HandleFunc("/validate", ValidateLocationHandler)
 	http.HandleFunc("/validate/zip", ValidateZipHandler)
 	http.HandleFunc("/validate/phone", ValidatePhoneHandler)
+	http.HandleFunc("/validate/ip", ValidateIPHandler)
 
 	port := getEnvDefault("GORATIO_PORT", "8080")
 
@@ -137,6 +175,23 @@ func ValidatePhoneHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
+func ValidateIPHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+
+	location, errorResponse := ExtractLocation(r)
+	response, errorResponse := ValidateLocation(location, errorResponse)
+
+	if errorResponse.Error != "" {
+		errorOutput, _ := json.Marshal(errorResponse)
+		w.WriteHeader(400)
+		w.Write(errorOutput)
+		return
+	}
+
+	output, _ := json.Marshal(response.IP)
+	w.Write(output)
+}
+
 func ExtractLocation(r *http.Request) (*Location, ErrorResponse) {
 	errorResponse := ErrorResponse{}
 
@@ -166,6 +221,7 @@ func ValidateLocation(location *Location, error ErrorResponse) (*ResponseLocatio
 	response.Phone = ValidatePhone(location.Phone)
 	response.Zip = ValidateZipCode(location.Zip)
 	response.Email = ValidateEmail(location.Email)
+	response.IP = ValidateIP(location.IP)
 	response.Vat = ValidateVat(location.VatCode)
 
 	return response, error
@@ -220,6 +276,43 @@ func ValidateEmail(email string) ResponseEmail {
 	err := validation.Validate(email, is.Email)
 	emailValid := err == nil
 	response.Valid = &emailValid
+
+	return response
+}
+
+func ValidateIP(ip string) ResponseIP {
+	response := ResponseIP{}
+	responseGeo := ResponseIPGeo{}
+	if ip == "" {
+		return response
+	}
+
+	isValid := false
+	response.Address = ip
+	response.Valid = &isValid
+	ipObj := net.ParseIP(ip)
+	if ipObj == nil {
+		response.Error = fmt.Sprintf("Invalid IP address [%s]", ip)
+		return response
+	}
+
+	isValid = true
+	response.Valid = &isValid
+
+	if !geoEnable {
+		return response
+	}
+
+	record, err := geoDB.City(ipObj)
+	if err != nil {
+		response.Error = err.Error()
+		return response
+	}
+
+	responseGeo.CountryCode = record.Country.IsoCode
+	responseGeo.CountryName = record.Country.Names["en"]
+	responseGeo.City = record.City.Names["en"]
+	response.Geo = responseGeo
 
 	return response
 }

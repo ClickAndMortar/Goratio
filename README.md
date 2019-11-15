@@ -7,6 +7,7 @@ Goratio is a location validation microservice for:
 * Postal codes / zip codes (using [Unicode Common Locale Data Repository](http://cldr.unicode.org/) regexes)
 * Phone numbers (using [Google's libphonenumber](https://github.com/google/libphonenumber))
 * Email addresses
+* IP addresses with GeoIP (using [Maxmind's GeoLite2 DB](https://dev.maxmind.com/geoip/geoip2/geolite2/))
 * VAT numbers (coming)
 
 ## Usage
@@ -25,7 +26,8 @@ With the application running, post your query to the `/validate` endpoint:
         "code": "06000",
         "country": "FR"
     },
-    "email": "john.doe@example.com"
+    "email": "john.doe@example.com",
+    "ip": "3.3.3.3"
 }
 ```
 
@@ -51,8 +53,34 @@ Will output the following result:
     "email": {
         "address": "john.doe@example.com",
         "valid": true
+    },
+    "ip": {
+        "address": "3.3.3.3",
+        "valid": true,
+        "geo": {
+            "country_code": "US",
+            "country_name": "United States",
+            "city": "Seattle"
+        }
     }
 }
+```
+
+### GeoIP
+
+Path to a GeoLite2 DB (`.mmdb` format) defaults to `/var/GeoLite2.mmdb`.
+
+It's path may be defined explicitely using `GEOIP_DB_PATH` environment variable.
+
+If the file at the given path does not exist or is not valid, GeoIP feature is disabled.
+
+ℹ️  Note that GeoLite2 Country database might be slightly faster than the City DB. Consider using it if you don't need a city-level accuracy.
+
+#### Downloading the DB
+
+```bash
+wget https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz -O GeoLite2.tgz
+tar --strip-components=1 -zxf GeoLite2.tar.gz *.mmdb
 ```
 
 ## Testing

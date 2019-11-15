@@ -1,3 +1,5 @@
 .idea
 tmp
 coverage.out
+db/*
+!db/.gitkeep
